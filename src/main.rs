@@ -1,76 +1,74 @@
-fn main() {
-    {
-        let _ = Timer::new("thread 1");
-        let _ = Timer::new("thread 2");
-        let _ = Timer::new("thread 3");
-        let _ = Timer::new("thread 4");
-    }
+use inputs::{tn, Timer, Timing};
 
-    while let Ok(timing) = GLOBAL_TIMER.receiver.recv() {
-        println!("{:?}", timing);
-    }
-}
-
-use lazy_static;
-
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
-#[derive(Debug)]
-struct Timing {
-    name: Option<String>,
-    duration: Duration,
+fn main() {
+    {
+        let _a = MyTimer::new(tn!("maggie"));
+        let _b = MyTimer::new(tn!("milly"));
+        x::something();
+        let _c = MyTimer::new(tn!("molly"));
+        let _d = MyTimer::new(tn!("may"));
+    }
+
+    // wait for all the drop threads to finish
+    std::thread::sleep(Duration::from_micros(1));
+
+    match GLOBAL_TIMER.lock() {
+        Ok(queue) => {
+            for timing in queue.iter() {
+                println!(
+                    "{} took {}s ({}ns)",
+                    timing.name,
+                    timing.duration.as_secs(),
+                    timing.duration.as_nanos()
+                );
+            }
+        }
+
+        Err(e) => eprintln!("couldn't check timings: {}", e),
+    }
+}
+
+mod x {
+    use super::*;
+    pub fn something() {
+        let _x = MyTimer::new(tn!("something"));
+        std::thread::sleep(Duration::from_secs(14));
+    }
 }
 
 #[derive(Debug)]
-struct Timer {
+pub struct MyTimer {
     name: Option<String>,
     begin: Instant,
 }
 
-unsafe impl std::marker::Sync for Timer {}
-
-impl Timer {
-    pub fn new(name: &str) -> Self {
-        Timer {
-            name: Some(name.to_owned()),
-            begin: std::time::Instant::now(),
+impl MyTimer {
+    #[must_use]
+    pub fn new(name: String) -> Self {
+        MyTimer {
+            name: Some(name),
+            begin: Instant::now(),
         }
     }
 
-    pub fn end(&mut self) -> Timing {
+    fn end(&mut self) -> Timing {
         Timing {
-            // use Option::take to avoid cloning
-            name: self.name.take(),
-            duration: std::time::Instant::now() - self.begin,
+            name: self.name.take().unwrap(),
+            begin: self.begin,
+            duration: Instant::now() - self.begin,
         }
     }
 }
 
-impl Drop for Timer {
+impl Drop for MyTimer {
     fn drop(&mut self) {
-        // or use RwLock and spawn a new thread to drop ourselves
-        let sender = GLOBAL_TIMER.sender.clone();
-        match sender.send(self.end()) {
-            Ok(_) => {}
-            Err(_) => eprintln!("couldn't drop {:?}", self.name),
-        }
+        let end = self.end();
+        std::thread::spawn(move || GLOBAL_TIMER.queue(end));
     }
 }
-
-struct GlobalTimer {
-    pub sender: Sender<Timing>,
-    pub receiver: Receiver<Timing>,
-}
-
-unsafe impl std::marker::Sync for GlobalTimer {}
 
 lazy_static::lazy_static! {
-    static ref GLOBAL_TIMER: GlobalTimer = {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        GlobalTimer {
-            sender,
-            receiver,
-        }
-    };
+    static ref GLOBAL_TIMER: Timer = Timer::new();
 }
