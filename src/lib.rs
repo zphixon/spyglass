@@ -64,11 +64,65 @@ pub struct Timing {
     pub duration: Duration,
 }
 
-/// Helper macro to generate a relatively unique name for a timer.
+/// Get the name of the current function.
+///
+/// Examples:
+/// ```
+/// # pub fn main() {
+/// (|| {
+///     mod module {
+///         pub trait Trait {
+///             fn function(&self) {
+///                 let name = inputs::func!();
+///                 assert_eq!(
+///                     name,
+///                     "rust_out::main::{{closure}}::module::Trait::function",
+///                 );
+///             }
+///         }
+///         impl Trait for () {}
+///     }
+///     module::Trait::function(&());
+/// })()
+/// # }
+/// ```
+///
+/// From Veedrac via [StackOverflow](https://stackoverflow.com/a/40234666).
 #[macro_export]
-macro_rules! tn {
+macro_rules! func {
+    () => {{
+        fn type_name_of<T>(_: T) -> &'static str {
+            std::any::type_name::<T>()
+        }
+
+        fn f() {};
+        let name = type_name_of(f);
+        &name[..name.len() - 3]
+    }};
+}
+
+/// Helper macro to generate a relatively unique name for a timer.
+///
+/// Examples:
+/// ```
+/// # use inputs::*;
+/// # fn main() {
+/// let name = inputs::t!();
+/// let name2 = inputs::t!("name2");
+///
+/// // directory separators will be different depending on your OS
+/// assert_eq!("[rust_out::main] src\\lib.rs:5", name);
+/// assert_eq!("[rust_out::main] name2 (src\\lib.rs:6)", name2);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! t {
     ($name:expr) => {
-        format!("{} {}:{}", $name, file!(), line!())
+        format!("[{}] {} ({}:{})", $crate::func!(), $name, file!(), line!())
+    };
+
+    () => {
+        format!("[{}] {}:{}", $crate::func!(), file!(), line!())
     };
 }
 
