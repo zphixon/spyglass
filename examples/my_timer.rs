@@ -1,14 +1,18 @@
-use inputs::{tn, Timer, Timing};
+use inputs::{func, t, Timer, Timing};
 
 use std::time::{Duration, Instant};
 
 fn main() {
     {
-        let _a = MyTimer::new(tn!("maggie"));
-        let _b = MyTimer::new(tn!("milly"));
-        x::something();
-        let _c = MyTimer::new(tn!("molly"));
-        let _d = MyTimer::new(tn!("may"));
+        let _a = MyTimer::new(t!("maggie"));
+        let _b = MyTimer::new(t!("milly"));
+        x::something_expensive();
+        let _c = MyTimer::new(t!("molly"));
+        let _d = MyTimer::new(t!("may"));
+    }
+
+    {
+        let _t = MyTimer::new(t!());
     }
 
     // wait for all the drop threads to finish
@@ -32,9 +36,22 @@ fn main() {
 
 mod x {
     use super::*;
-    pub fn something() {
-        let _x = MyTimer::new(tn!("something"));
-        std::thread::sleep(Duration::from_secs(14));
+
+    pub fn something_expensive() {
+        let _x = MyTimer::new(func!());
+
+        for _ in 0..15 {
+            dot();
+        }
+
+        println!();
+    }
+
+    fn dot() {
+        use std::io::Write;
+        print!(".");
+        std::io::stdout().flush().unwrap();
+        std::thread::sleep(Duration::from_secs(1));
     }
 }
 
@@ -46,9 +63,9 @@ pub struct MyTimer {
 
 impl MyTimer {
     #[must_use]
-    pub fn new(name: String) -> Self {
+    pub fn new<T: ToString>(name: T) -> Self {
         MyTimer {
-            name: Some(name),
+            name: Some(name.to_string()),
             begin: Instant::now(),
         }
     }
