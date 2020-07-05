@@ -1,4 +1,4 @@
-use inputs::{func, t, Timer, Timing};
+use spyglass::{func, t, Timer, Timing};
 
 use std::time::{Duration, Instant};
 
@@ -57,7 +57,7 @@ mod x {
 
 #[derive(Debug)]
 pub struct MyTimer {
-    name: Option<String>,
+    name: String,
     begin: Instant,
 }
 
@@ -65,14 +65,14 @@ impl MyTimer {
     #[must_use]
     pub fn new<T: ToString>(name: T) -> Self {
         MyTimer {
-            name: Some(name.to_string()),
+            name: name.to_string(),
             begin: Instant::now(),
         }
     }
 
     fn end(&mut self) -> Timing {
         Timing {
-            name: self.name.take().unwrap(),
+            name: self.name.clone(),
             begin: self.begin,
             duration: Instant::now() - self.begin,
         }
@@ -86,6 +86,6 @@ impl Drop for MyTimer {
     }
 }
 
-lazy_static::lazy_static! {
+spyglass::lazy_static! {
     static ref GLOBAL_TIMER: Timer = Timer::new();
 }
